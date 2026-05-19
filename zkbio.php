@@ -109,7 +109,7 @@ class ZKBio
                 return true;
             }
 
-            throw new Exception("Authentication failed: No token returned.");
+            throw new Exception("Authentication failed: No token returned. Response: " . $response);
         } catch (Exception $e) {
             error_log("ZKBio Auth Error: " . $e->getMessage());
             throw $e;
