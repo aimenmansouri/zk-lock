@@ -72,6 +72,7 @@ class HotelLockEncoder {
 
             // Step 1: Read physical hardware UID
             const uidResponse = await this._readCardUid();
+            console.log("uid", uidResponse);
             if (!uidResponse.success || !uidResponse.uid) {
                 throw new Error("Failed to read Card UID. Is a card placed on the encoder?");
             }
@@ -137,7 +138,7 @@ class HotelLockEncoder {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
-        console.log(123, response);
+
         if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
         return await response.json();
     }
