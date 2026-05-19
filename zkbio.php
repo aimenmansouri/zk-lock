@@ -64,7 +64,7 @@ class ZKBio
     public function authenticate($clientId, $clientSecret)
     {
         try {
-            $url = 'https://127.0.0.1:8098/api/v1/api-client-auth/';
+            $url = $this->zkbio_address . '/api/v1/api-client-auth/';
             $ch = curl_init($url);
 
             $payload = json_encode([
