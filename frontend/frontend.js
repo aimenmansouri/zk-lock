@@ -137,6 +137,7 @@ class HotelLockEncoder {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
+        console.log(123, response);
         if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
         return await response.json();
     }
