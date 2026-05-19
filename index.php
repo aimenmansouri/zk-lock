@@ -17,7 +17,7 @@ try {
     $zkbio->authenticate($clientId, $clientSecret);
 } catch (Exception $e) {
     echo json_encode([
-        'success' => false, 
+        'success' => false,
         'error' => 'Authentication failed: ' . $e->getMessage()
     ]);
     exit;

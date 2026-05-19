@@ -85,6 +85,7 @@ class ZKBio
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Follow redirects (e.g. slash additions/302 redirects)
 
             $response = curl_exec($ch);
 
@@ -100,7 +101,7 @@ class ZKBio
             $decoded = json_decode($response, true);
 
             if ($httpCode >= 400) {
-                $error = $decoded['detail'] ?? $decoded['message'] ?? 'Unknown API Error';
+                $error = $decoded['detail'] ?? $decoded['message'] ?? json_encode($decoded) ?: 'Unknown API Error';
                 throw new Exception("Authentication API Error ({$httpCode}): " . $error);
             }
 
@@ -109,7 +110,7 @@ class ZKBio
                 return true;
             }
 
-            throw new Exception("Authentication failed: No token returned. Response: " . $response);
+            throw new Exception("Authentication failed: No token returned. HTTP Status: {$httpCode}. Response: " . $response);
         } catch (Exception $e) {
             error_log("ZKBio Auth Error: " . $e->getMessage());
             throw $e;
