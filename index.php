@@ -128,8 +128,9 @@ switch ($action) {
         }
 
         try {
+            $apiPath = '/api/card' . $endpoint;
             // Use the authenticated ZKBio request method to hit port 8098 with the access_token
-            $response = $zkbio->request($method, '/api/card' . $endpoint, $postData);
+            $response = $zkbio->request($method, $apiPath, $postData);
             echo json_encode($response);
         } catch (Exception $e) {
             $httpCode = 500;
@@ -139,7 +140,7 @@ switch ($action) {
             http_response_code($httpCode);
             echo json_encode([
                 'success' => false, 
-                'error' => 'Proxy API Error: ' . $e->getMessage()
+                'error' => 'Proxy API Error on path ' . $apiPath . ': ' . $e->getMessage()
             ]);
         }
         break;
