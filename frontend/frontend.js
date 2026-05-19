@@ -140,30 +140,20 @@ class HotelLockEncoder {
         });
 
         if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
-        
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            throw new Error(`Invalid JSON from encoder: ${text}`);
-        }
+        return await response.json();
     }
 
     async _writeSector(hexData) {
         const response = await fetch(`${this.localEncoderUrl}/writeSector`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({ hex_data: hexData })
         });
-
         if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
-        
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            throw new Error(`Invalid JSON from encoder: ${text}`);
-        }
+        return await response.json();
     }
 
     async _fetchWriteStringFromBackend(cardUid, roomCode, startTime, endTime) {

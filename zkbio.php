@@ -22,10 +22,6 @@ class ZKBio
 
         if ($this->token) {
             $headers[] = 'Authorization: JWT ' . $this->token;
-            $headers[] = 'access_token: ' . $this->token;
-            
-            // The ZKBio API docs state it expects access_token as a parameter
-            $url .= (strpos($url, '?') !== false ? '&' : '?') . 'access_token=' . $this->token;
         }
 
         $options = [
@@ -67,11 +63,63 @@ class ZKBio
 
     public function authenticate($clientId, $clientSecret)
     {
-        // According to the ZKBio CVSecurity API documentation:
-        // The API Client token is a static token generated in the UI.
-        // We do not need to make an HTTP login request, we just attach it to every request!
-        $this->token = $clientSecret;
-        return true;
+        try {
+            // ZKBio SPA returns HTML when a route doesn't exist. Reverting to the standard JWT endpoint.
+            $url = $this->zkbio_address . '/api/v1/jwt/api-token-auth/';
+            $ch = curl_init($url);
+
+            // API Clients in ZKBio often authenticate against the standard JWT endpoint using their ID/Secret as Username/Password
+            $payload = json_encode([
+                "username" => $clientId,
+                "password" => $clientSecret,
+                'grant_type' => 'client_credentials',
+            ]);
+
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Accept: application/json'
+            ]);
+
+            // Disable SSL verification for localhost development
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Follow redirects (e.g. slash additions/302 redirects)
+
+            $response = curl_exec($ch);
+
+            if (curl_errno($ch)) {
+                $error_msg = curl_error($ch);
+                curl_close($ch);
+                throw new Exception("cURL Error: " . $error_msg);
+            }
+
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            curl_close($ch);
+
+            $decoded = json_decode($response, true);
+
+            if ($httpCode >= 400) {
+                $error = $decoded['detail'] ?? $decoded['message'] ?? json_encode($decoded) ?: 'Unknown API Error';
+                throw new Exception("Authentication API Error ({$httpCode}) at {$effectiveUrl}: " . $error);
+            }
+
+            if (isset($decoded['token'])) {
+                $this->token = $decoded['token'];
+                return true;
+            }
+
+            throw new Exception("Authentication failed: No token returned. HTTP Status: {$httpCode}. Effective URL: {$effectiveUrl}. Response: " . $response);
+        } catch (Exception $e) {
+            error_log("ZKBio Auth Error: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function getOfflineWriteString($cardUid, $roomCode, $startTime, $endTime, $copyCounter = 1)
