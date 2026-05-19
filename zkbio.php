@@ -4,15 +4,25 @@ class ZKBio
 {
     private $zkbio_address;
     private $token;
+    private $authMode = 'none'; // 'jwt' or 'access_token'
 
     public function __construct($zkbio_address)
     {
         $this->zkbio_address = rtrim($zkbio_address, '/');
     }
 
+    /**
+     * Make an authenticated API request to ZKBio CVSecurity.
+     */
     private function request($method, $endpoint, $data = null)
     {
         $url = $this->zkbio_address . $endpoint;
+
+        // If using static access_token mode, append it as a query parameter
+        if ($this->authMode === 'access_token' && $this->token) {
+            $url .= (strpos($url, '?') !== false ? '&' : '?') . 'access_token=' . $this->token;
+        }
+
         $ch = curl_init($url);
 
         $headers = [
@@ -20,7 +30,8 @@ class ZKBio
             'Accept: application/json'
         ];
 
-        if ($this->token) {
+        // If using JWT mode, send token in Authorization header
+        if ($this->authMode === 'jwt' && $this->token) {
             $headers[] = 'Authorization: JWT ' . $this->token;
         }
 
@@ -28,10 +39,11 @@ class ZKBio
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => strtoupper($method),
             CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_CONNECTTIMEOUT => 2, // Strict 2s connect timeout
-            CURLOPT_TIMEOUT => 5, // Strict 5s execution timeout
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
             CURLOPT_SSL_VERIFYPEER => false, // For local HTTPS instances
-            CURLOPT_SSL_VERIFYHOST => false
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_FOLLOWLOCATION => true
         ];
 
         if ($data !== null) {
@@ -61,65 +73,75 @@ class ZKBio
         return $decoded;
     }
 
+    /**
+     * Authenticate using JWT mode (username + password).
+     * This calls POST /jwt-api-token-auth/ with admin credentials.
+     */
+    public function authenticateJWT($username, $password)
+    {
+        $url = $this->zkbio_address . '/jwt-api-token-auth/';
+        $ch = curl_init($url);
+
+        $payload = json_encode([
+            'username' => $username,
+            'password' => $password
+        ]);
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+
+        $response = curl_exec($ch);
+
+        if (curl_errno($ch)) {
+            $error_msg = curl_error($ch);
+            curl_close($ch);
+            throw new Exception("cURL Error: " . $error_msg);
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        curl_close($ch);
+
+        $decoded = json_decode($response, true);
+
+        if ($httpCode >= 400) {
+            $error = $decoded['detail'] ?? $decoded['message'] ?? 'Unknown API Error';
+            throw new Exception("JWT Auth Error ({$httpCode}) at {$effectiveUrl}: " . $error);
+        }
+
+        if (isset($decoded['token'])) {
+            $this->token = $decoded['token'];
+            $this->authMode = 'jwt';
+            return true;
+        }
+
+        throw new Exception("JWT Auth failed: No token in response. HTTP {$httpCode}. URL: {$effectiveUrl}. Response: " . $response);
+    }
+
+    /**
+     * Authenticate using static access_token mode (API Client from ZKBio UI).
+     * No HTTP request needed — the token is generated in the ZKBio CVSecurity
+     * API Authorization panel and passed directly as a query parameter.
+     */
     public function authenticate($clientId, $clientSecret)
     {
-        try {
-            // ZKBio SPA returns HTML when a route doesn't exist. Reverting to the standard JWT endpoint.
-            $url = $this->zkbio_address . '/api/v1/jwt/api-token-auth/';
-            $ch = curl_init($url);
-
-            // API Clients in ZKBio often authenticate against the standard JWT endpoint using their ID/Secret as Username/Password
-            $payload = json_encode([
-                "username" => $clientId,
-                "password" => $clientSecret,
-                'grant_type' => 'client_credentials',
-            ]);
-
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/json',
-                'Accept: application/json'
-            ]);
-
-            // Disable SSL verification for localhost development
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Follow redirects (e.g. slash additions/302 redirects)
-
-            $response = curl_exec($ch);
-
-            if (curl_errno($ch)) {
-                $error_msg = curl_error($ch);
-                curl_close($ch);
-                throw new Exception("cURL Error: " . $error_msg);
-            }
-
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-            curl_close($ch);
-
-            $decoded = json_decode($response, true);
-
-            if ($httpCode >= 400) {
-                $error = $decoded['detail'] ?? $decoded['message'] ?? json_encode($decoded) ?: 'Unknown API Error';
-                throw new Exception("Authentication API Error ({$httpCode}) at {$effectiveUrl}: " . $error);
-            }
-
-            if (isset($decoded['token'])) {
-                $this->token = $decoded['token'];
-                return true;
-            }
-
-            throw new Exception("Authentication failed: No token returned. HTTP Status: {$httpCode}. Effective URL: {$effectiveUrl}. Response: " . $response);
-        } catch (Exception $e) {
-            error_log("ZKBio Auth Error: " . $e->getMessage());
-            throw $e;
-        }
+        // The ZKBio CVSecurity API documentation states:
+        // "access_token: API access token is to check whether the requested 
+        //  permission is allowed or denied."
+        // This is a static token generated in the ZKBio UI. No login call needed.
+        $this->token = $clientSecret;
+        $this->authMode = 'access_token';
+        return true;
     }
 
     public function getOfflineWriteString($cardUid, $roomCode, $startTime, $endTime, $copyCounter = 1)

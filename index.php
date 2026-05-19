@@ -108,9 +108,20 @@ switch ($action) {
         break;
 
     case 'proxy_encoder':
+        // Add CORS headers so frontend can call this proxy
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Accept');
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+
         $endpoint = $_GET['endpoint'] ?? '';
         $method = $_SERVER['REQUEST_METHOD'];
-        $url = 'http://127.0.0.1:8088/api/card' . $endpoint;
+        // Port 24009 is the ZKBio local card encoder service
+        $url = 'http://127.0.0.1:24009/api/card' . $endpoint;
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
