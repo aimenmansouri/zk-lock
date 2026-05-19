@@ -4,7 +4,7 @@
  */
 
 class HotelLockEncoder {
-    constructor(backendUrl = '/index.php', localEncoderUrl = 'http://127.0.0.1:8088/api/card') {
+    constructor(backendUrl = '/index.php', localEncoderUrl = '/index.php?action=proxy_encoder&endpoint=') {
         this.backendUrl = backendUrl;
         this.localEncoderUrl = localEncoderUrl;
     }
@@ -63,6 +63,75 @@ class HotelLockEncoder {
         }
     }
 
+    /**
+     * Reads a card and fetches its parsed data from the backend.
+     */
+    async readCard() {
+        try {
+            console.log("Reading card...");
+            
+            // Step 1: Read physical hardware UID
+            const uidResponse = await this._readCardUid();
+            if (!uidResponse.success || !uidResponse.uid) {
+                throw new Error("Failed to read Card UID. Is a card placed on the encoder?");
+            }
+
+            // Step 2: Read physical sector data (hex) from encoder
+            const sectorResponse = await this._readSector();
+            if (!sectorResponse.success || !sectorResponse.hex_data) {
+                throw new Error("Failed to read sector data from the card.");
+            }
+
+            // Step 3: Fetch parsed data from backend
+            const backendResponse = await this._fetchReadCardFromBackend(sectorResponse.hex_data);
+            if (!backendResponse.success) {
+                throw new Error("Backend failed to parse card data: " + (backendResponse.error || 'Unknown error'));
+            }
+
+            console.log("✅ Card successfully read.");
+            return backendResponse.data;
+
+        } catch (error) {
+            console.error("❌ Card Read Error:", error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Revokes a card by clearing its sector data and updating the backend.
+     */
+    async revokeCard() {
+        try {
+            console.log("Revoking card...");
+            
+            // Step 1: Read physical hardware UID
+            const uidResponse = await this._readCardUid();
+            if (!uidResponse.success || !uidResponse.uid) {
+                throw new Error("Failed to read Card UID. Is a card placed on the encoder?");
+            }
+            const cardUid = uidResponse.uid;
+
+            // Step 2: Clear physical sector data via encoder
+            const clearResponse = await this._clearSector();
+            if (!clearResponse.success) {
+                throw new Error("Failed to clear data on the physical card.");
+            }
+
+            // Step 3: Confirm revocation with backend
+            const backendResponse = await this._confirmRevokeWithBackend(cardUid);
+            if (!backendResponse.success) {
+                throw new Error("Hardware clear succeeded, but backend revocation failed: " + backendResponse.error);
+            }
+
+            console.log("✅ Card successfully revoked.");
+            return true;
+
+        } catch (error) {
+            console.error("❌ Card Revoke Error:", error.message);
+            throw error;
+        }
+    }
+
     async _readCardUid() {
         const response = await fetch(`${this.localEncoderUrl}/readUid`, {
             method: 'GET',
@@ -116,6 +185,56 @@ class HotelLockEncoder {
                 card_uid: cardUid,
                 room_code: roomCode,
                 status: true // Hardware confirmed
+            })
+        });
+        if (!response.ok) throw new Error(`Backend HTTP error: ${response.status}`);
+        return await response.json();
+    }
+
+    async _readSector() {
+        const response = await fetch(`${this.localEncoderUrl}/readSector`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
+        return await response.json();
+    }
+
+    async _clearSector() {
+        const response = await fetch(`${this.localEncoderUrl}/clearSector`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error(`Local encoder HTTP error: ${response.status}`);
+        return await response.json();
+    }
+
+    async _fetchReadCardFromBackend(hexData) {
+        const response = await fetch(this.backendUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'read_card',
+                hex_data: hexData
+            })
+        });
+        if (!response.ok) throw new Error(`Backend HTTP error: ${response.status}`);
+        return await response.json();
+    }
+
+    async _confirmRevokeWithBackend(cardUid) {
+        const response = await fetch(this.backendUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'revoke_card',
+                card_uid: cardUid
             })
         });
         if (!response.ok) throw new Error(`Backend HTTP error: ${response.status}`);

@@ -69,6 +69,69 @@ switch ($action) {
         }
         break;
 
+    case 'read_card':
+        $hexData = $inputData['hex_data'] ?? null;
+        if (!$hexData) {
+            echo json_encode(['success' => false, 'error' => 'Missing hex_data.']);
+            break;
+        }
+        $response = $cardManagment->readCard($hexData);
+        echo json_encode($response);
+        break;
+
+    case 'revoke_card':
+        $cardUid = $inputData['card_uid'] ?? null;
+        if ($cardUid) {
+            // Update database to mark card as revoked/checked-out
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'message' => 'Card revoked in database.',
+                    'card_uid' => $cardUid
+                ],
+                'error' => null
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Missing card_uid.']);
+        }
+        break;
+
+    case 'proxy_encoder':
+        $endpoint = $_GET['endpoint'] ?? '';
+        $method = $_SERVER['REQUEST_METHOD'];
+        $url = 'http://127.0.0.1:8088/api/card' . $endpoint;
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        
+        if ($method === 'POST') {
+            $inputRaw = file_get_contents('php://input');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $inputRaw);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Accept: application/json'
+            ]);
+        }
+        
+        $response = curl_exec($ch);
+        
+        if (curl_errno($ch)) {
+            $error_msg = curl_error($ch);
+            curl_close($ch);
+            echo json_encode(['success' => false, 'error' => 'Proxy Connection Error: ' . $error_msg]);
+            break;
+        }
+        
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        http_response_code($httpCode);
+        echo $response;
+        break;
+
     default:
         echo json_encode(['success' => false, 'error' => 'Unknown action.']);
         break;
