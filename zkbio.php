@@ -96,13 +96,14 @@ class ZKBio
             }
 
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
             curl_close($ch);
 
             $decoded = json_decode($response, true);
 
             if ($httpCode >= 400) {
                 $error = $decoded['detail'] ?? $decoded['message'] ?? json_encode($decoded) ?: 'Unknown API Error';
-                throw new Exception("Authentication API Error ({$httpCode}): " . $error);
+                throw new Exception("Authentication API Error ({$httpCode}) at {$effectiveUrl}: " . $error);
             }
 
             if (isset($decoded['token'])) {
@@ -110,7 +111,7 @@ class ZKBio
                 return true;
             }
 
-            throw new Exception("Authentication failed: No token returned. HTTP Status: {$httpCode}. Response: " . $response);
+            throw new Exception("Authentication failed: No token returned. HTTP Status: {$httpCode}. Effective URL: {$effectiveUrl}. Response: " . $response);
         } catch (Exception $e) {
             error_log("ZKBio Auth Error: " . $e->getMessage());
             throw $e;
