@@ -10,11 +10,11 @@ require_once 'card-managment.php';
 $zkbio_address = $_ENV['ZKBIO'] ?? 'https://localhost:8098/';
 $zkbio = new ZKBio($zkbio_address);
 
-// Quick integration example using Client ID "hotelo"
+// Quick integration example using Client ID from .env
 try {
-    // You should store the client secret in .env, e.g. $_ENV['ZKBIO_CLIENT_SECRET']
-    $clientSecret = $_ENV['ZKBIO_CLIENT_SECRET'] ?? 'default_secret';
-    $zkbio->authenticate('hotelo', $clientSecret);
+    $clientId = trim($_ENV['ZKBIO_CLIENTID'] ?? 'hotelo', '"; ');
+    $clientSecret = trim($_ENV['ZKBIO_CLIENT_SECRET'] ?? 'default_secret', '"; ');
+    $zkbio->authenticate($clientId, $clientSecret);
 } catch (Exception $e) {
     echo json_encode([
         'success' => false, 
