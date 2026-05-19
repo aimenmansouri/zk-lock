@@ -42,9 +42,9 @@ header("Pragma: no-cache");
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: top;
             justify-content: center;
-            overflow: hidden;
+
         }
 
         .container {

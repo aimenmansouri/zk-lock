@@ -6,12 +6,23 @@ require_once 'config/env.php';
 require_once 'zkbio.php';
 require_once 'card-managment.php';
 
-// Initialize ZKBio and CardManagment
+// Initialize ZKBio
 $zkbio_address = $_ENV['ZKBIO'] ?? 'https://localhost:8098/';
-$username = $_ENV['ZKBIO_USERNAME'] ?? 'admin';
-$password = $_ENV['ZKBIO_PASSWORD'] ?? 'admin';
+$zkbio = new ZKBio($zkbio_address);
 
-$zkbio = new ZKBio($zkbio_address, $username, $password);
+// Quick integration example using Client ID "hotelo"
+try {
+    // You should store the client secret in .env, e.g. $_ENV['ZKBIO_CLIENT_SECRET']
+    $clientSecret = $_ENV['ZKBIO_CLIENT_SECRET'] ?? 'default_secret';
+    $zkbio->authenticate('hotelo', $clientSecret);
+} catch (Exception $e) {
+    echo json_encode([
+        'success' => false, 
+        'error' => 'Authentication failed: ' . $e->getMessage()
+    ]);
+    exit;
+}
+
 $cardManagment = new CardManagment($zkbio);
 
 // Get JSON POST body if applicable
@@ -50,7 +61,7 @@ switch ($action) {
         if ($status === true && $cardUid && $roomCode) {
             // Handshake Rule: Hardware success explicitly confirmed by JS
             // Here you would update your database reservation status to 'checked-in'
-            
+
             echo json_encode([
                 'success' => true,
                 'data' => [
@@ -100,13 +111,13 @@ switch ($action) {
         $endpoint = $_GET['endpoint'] ?? '';
         $method = $_SERVER['REQUEST_METHOD'];
         $url = 'http://127.0.0.1:8088/api/card' . $endpoint;
-        
+
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        
+
         if ($method === 'POST') {
             $inputRaw = file_get_contents('php://input');
             curl_setopt($ch, CURLOPT_POSTFIELDS, $inputRaw);
@@ -115,19 +126,19 @@ switch ($action) {
                 'Accept: application/json'
             ]);
         }
-        
+
         $response = curl_exec($ch);
-        
+
         if (curl_errno($ch)) {
             $error_msg = curl_error($ch);
             curl_close($ch);
             echo json_encode(['success' => false, 'error' => 'Proxy Connection Error: ' . $error_msg]);
             break;
         }
-        
+
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        
+
         http_response_code($httpCode);
         echo $response;
         break;

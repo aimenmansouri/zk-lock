@@ -3,15 +3,11 @@
 class ZKBio
 {
     private $zkbio_address;
-    private $username;
-    private $password;
     private $token;
 
-    public function __construct($zkbio_address, $username, $password)
+    public function __construct($zkbio_address)
     {
         $this->zkbio_address = rtrim($zkbio_address, '/');
-        $this->username = $username;
-        $this->password = $password;
     }
 
     private function request($method, $endpoint, $data = null)
@@ -45,7 +41,7 @@ class ZKBio
         curl_setopt_array($ch, $options);
 
         $response = curl_exec($ch);
-        
+
         if (curl_errno($ch)) {
             $error_msg = curl_error($ch);
             curl_close($ch);
@@ -56,7 +52,7 @@ class ZKBio
         curl_close($ch);
 
         $decoded = json_decode($response, true);
-        
+
         if ($httpCode >= 400) {
             $error = $decoded['detail'] ?? $decoded['message'] ?? 'Unknown API Error';
             throw new Exception("API Error ({$httpCode}): " . $error);
@@ -65,19 +61,54 @@ class ZKBio
         return $decoded;
     }
 
-    public function authenticate()
+    public function authenticate($clientId, $clientSecret)
     {
         try {
-            $response = $this->request('POST', '/api/v1/jwt/api-token-auth/', [
-                'username' => $this->username,
-                'password' => $this->password
+            $url = 'https://127.0.0.1:8098/api/v1/api-client-auth/';
+            $ch = curl_init($url);
+
+            $payload = json_encode([
+                "client_id" => $clientId,
+                "client_secret" => $clientSecret
             ]);
 
-            if (isset($response['token'])) {
-                $this->token = $response['token'];
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Accept: application/json'
+            ]);
+
+            // Disable SSL verification for localhost development
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            $response = curl_exec($ch);
+
+            if (curl_errno($ch)) {
+                $error_msg = curl_error($ch);
+                curl_close($ch);
+                throw new Exception("cURL Error: " . $error_msg);
+            }
+
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $decoded = json_decode($response, true);
+
+            if ($httpCode >= 400) {
+                $error = $decoded['detail'] ?? $decoded['message'] ?? 'Unknown API Error';
+                throw new Exception("Authentication API Error ({$httpCode}): " . $error);
+            }
+
+            if (isset($decoded['token'])) {
+                $this->token = $decoded['token'];
                 return true;
             }
-            
+
             throw new Exception("Authentication failed: No token returned.");
         } catch (Exception $e) {
             error_log("ZKBio Auth Error: " . $e->getMessage());
@@ -89,7 +120,7 @@ class ZKBio
     {
         try {
             if (!$this->token) {
-                $this->authenticate();
+                throw new Exception("Not authenticated. Call authenticate() first.");
             }
 
             // Placeholder route: Replace with exact ZK CVSecurity API route
@@ -104,7 +135,7 @@ class ZKBio
             if (isset($response['hex_data'])) {
                 return $response['hex_data'];
             }
-            
+
             throw new Exception("Failed to retrieve offline write string.");
         } catch (Exception $e) {
             error_log("ZKBio getOfflineWriteString Error: " . $e->getMessage());
@@ -116,7 +147,7 @@ class ZKBio
     {
         try {
             if (!$this->token) {
-                $this->authenticate();
+                throw new Exception("Not authenticated. Call authenticate() first.");
             }
 
             // Placeholder route: Replace with exact ZK CVSecurity API route

@@ -69,7 +69,7 @@ class HotelLockEncoder {
     async readCard() {
         try {
             console.log("Reading card...");
-            
+
             // Step 1: Read physical hardware UID
             const uidResponse = await this._readCardUid();
             if (!uidResponse.success || !uidResponse.uid) {
@@ -103,7 +103,7 @@ class HotelLockEncoder {
     async revokeCard() {
         try {
             console.log("Revoking card...");
-            
+
             // Step 1: Read physical hardware UID
             const uidResponse = await this._readCardUid();
             if (!uidResponse.success || !uidResponse.uid) {
