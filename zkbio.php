@@ -64,12 +64,15 @@ class ZKBio
     public function authenticate($clientId, $clientSecret)
     {
         try {
-            $url = $this->zkbio_address . '/api/v1/api-client-auth/';
+            // ZKBio SPA returns HTML when a route doesn't exist. Reverting to the standard JWT endpoint.
+            $url = $this->zkbio_address . '/api/v1/jwt/api-token-auth/';
             $ch = curl_init($url);
 
+            // API Clients in ZKBio often authenticate against the standard JWT endpoint using their ID/Secret as Username/Password
             $payload = json_encode([
-                "client_id" => $clientId,
-                "client_secret" => $clientSecret
+                "username" => $clientId,
+                "password" => $clientSecret,
+                'grant_type' => 'client_credentials',
             ]);
 
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -83,6 +86,7 @@ class ZKBio
             // Disable SSL verification for localhost development
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Follow redirects (e.g. slash additions/302 redirects)
