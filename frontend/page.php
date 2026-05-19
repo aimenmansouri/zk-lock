@@ -409,7 +409,7 @@ header("Pragma: no-cache");
             return datetimeLocalValue.replace('T', ' ') + ':00';
         }
 
-        const encoder = new HotelLockEncoder('../index.php', 'http://127.0.0.1:24009/api/card');
+        const encoder = new HotelLockEncoder('../index.php', '../index.php?action=proxy_encoder&endpoint=');
 
         function resetBtn(btnId, originalText) {
             const btn = document.getElementById(btnId);

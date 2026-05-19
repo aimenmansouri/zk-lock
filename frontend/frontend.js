@@ -4,7 +4,7 @@
  */
 
 class HotelLockEncoder {
-    constructor(backendUrl = '../index.php', localEncoderUrl = 'http://127.0.0.1:24009/api/card') {
+    constructor(backendUrl = '/index.php', localEncoderUrl = '/index.php?action=proxy_encoder&endpoint=') {
         this.backendUrl = backendUrl;
         this.localEncoderUrl = localEncoderUrl;
     }
