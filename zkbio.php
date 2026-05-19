@@ -14,7 +14,7 @@ class ZKBio
     /**
      * Make an authenticated API request to ZKBio CVSecurity.
      */
-    private function request($method, $endpoint, $data = null)
+    public function request($method, $endpoint, $data = null)
     {
         $url = $this->zkbio_address . $endpoint;
 

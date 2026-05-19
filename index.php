@@ -120,38 +120,28 @@ switch ($action) {
 
         $endpoint = $_GET['endpoint'] ?? '';
         $method = $_SERVER['REQUEST_METHOD'];
-        // Port 24009 is the ZKBio local card encoder service
-        $url = 'http://127.0.0.1:24009/api/card' . $endpoint;
-
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $postData = null;
 
         if ($method === 'POST') {
             $inputRaw = file_get_contents('php://input');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $inputRaw);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/json',
-                'Accept: application/json'
+            $postData = json_decode($inputRaw, true);
+        }
+
+        try {
+            // Use the authenticated ZKBio request method to hit port 8098 with the access_token
+            $response = $zkbio->request($method, '/api/card' . $endpoint, $postData);
+            echo json_encode($response);
+        } catch (Exception $e) {
+            $httpCode = 500;
+            if (preg_match('/API Error \((\d+)\)/', $e->getMessage(), $matches)) {
+                $httpCode = (int)$matches[1];
+            }
+            http_response_code($httpCode);
+            echo json_encode([
+                'success' => false, 
+                'error' => 'Proxy API Error: ' . $e->getMessage()
             ]);
         }
-
-        $response = curl_exec($ch);
-
-        if (curl_errno($ch)) {
-            $error_msg = curl_error($ch);
-            curl_close($ch);
-            echo json_encode(['success' => false, 'error' => 'Proxy Connection Error: ' . $error_msg]);
-            break;
-        }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        http_response_code($httpCode);
-        echo $response;
         break;
 
     default:
