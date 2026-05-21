@@ -200,13 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await writeCard(room, validDate);
             if (res.success) {
-                showStatus('✅ Card written for room ' + room, 'ok');
+                showStatus('succeed Card written for room ' + room, 'ok');
                 document.getElementById('room').value = '';
             } else {
-                showStatus('❌ ' + (res.error || 'Write failed'), 'err');
+                showStatus('failed ' + (res.error || 'Write failed'), 'err');
             }
         } catch (e) {
-            showStatus('❌ ' + e.message, 'err');
+            showStatus('failed ' + e.message, 'err');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Write Card';
@@ -222,12 +222,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await readCard();
             if (res.success) {
-                showStatus('✅ Card read', 'ok', res.data);
+                showStatus('succeed Card read', 'ok', res.data);
             } else {
-                showStatus('❌ ' + (res.error || 'Read failed'), 'err');
+                showStatus('failed ' + (res.error || 'Read failed'), 'err');
             }
         } catch (e) {
-            showStatus('❌ ' + e.message, 'err');
+            showStatus('failed ' + e.message, 'err');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Read Card';
